@@ -51,6 +51,7 @@ public class CheckGeneratingMavenArchetypeTest {
             NAME_OF_ARTIFACT + "/src/test/java/" + NAME_OF_ARTIFACT + "/AppTest.java",
             NAME_OF_ARTIFACT + "/pom.xml");
     ide.open(workspace);
+    consoles.waitJDTLSProjectResolveFinishedMessage(NAME_OF_ARTIFACT);
     menu.runCommand(
         TestMenuCommandsConstants.Workspace.WORKSPACE,
         TestMenuCommandsConstants.Workspace.CREATE_PROJECT);
