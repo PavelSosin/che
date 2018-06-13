@@ -26,8 +26,9 @@ import java.util.Map.Entry;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.eclipse.che.api.core.ConflictException;
-import org.eclipse.che.api.core.ForbiddenException;
+import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
+import org.eclipse.che.api.fs.server.FsManager;
 import org.eclipse.che.api.project.server.type.AttributeValue;
 import org.eclipse.che.ide.maven.tools.MavenArtifact;
 import org.eclipse.che.plugin.maven.generator.archetype.ArchetypeGenerator;
@@ -43,10 +44,12 @@ import org.eclipse.che.plugin.maven.shared.MavenArchetype;
 public class ArchetypeGenerationStrategy implements GeneratorStrategy {
 
   private final ArchetypeGenerator archetypeGenerator;
+  private final FsManager fsManager;
 
   @Inject
-  public ArchetypeGenerationStrategy(ArchetypeGenerator archetypeGenerator) throws ServerException {
+  public ArchetypeGenerationStrategy(ArchetypeGenerator archetypeGenerator, FsManager fsManager) {
     this.archetypeGenerator = archetypeGenerator;
+    this.fsManager = fsManager;
   }
 
   public String getId() {
@@ -56,7 +59,7 @@ public class ArchetypeGenerationStrategy implements GeneratorStrategy {
   @Override
   public void generateProject(
       String projectPath, Map<String, AttributeValue> attributes, Map<String, String> options)
-      throws ForbiddenException, ConflictException, ServerException {
+      throws ConflictException, ServerException {
 
     AttributeValue artifactId = attributes.get(ARTIFACT_ID);
     AttributeValue groupId = attributes.get(GROUP_ID);
@@ -112,5 +115,17 @@ public class ArchetypeGenerationStrategy implements GeneratorStrategy {
     mavenArtifact.setArtifactId(getFirst(artifactId.getList(), projectName));
     mavenArtifact.setVersion(getFirst(version.getList(), DEFAULT_VERSION));
     archetypeGenerator.generateFromArchetype(new File("/projects"), mavenArchetype, mavenArtifact);
+
+    // TODO Remove this block and use 'basedir' option of the Maven Archetype Plugin when the
+    // related issue will be solved: https://issues.apache.org/jira/browse/ARCHETYPE-311.
+    // Maven Archetype Plugin creates project directory with 'artifact-id' name, so need to rename
+    // it to specified project name.
+    if (!fsManager.exists(projectPath) && fsManager.exists(mavenArtifact.getArtifactId())) {
+      try {
+        fsManager.move(mavenArtifact.getArtifactId(), projectPath);
+      } catch (NotFoundException e) {
+        throw new ServerException(e);
+      }
+    }
   }
 }
